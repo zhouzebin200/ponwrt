@@ -1,0 +1,40 @@
+name: Build ZN515XG-D firmware
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-zn515.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache clang cmake cpio curl device-tree-compiler ecj fastjar flex gawk gettext gcc-multilib g++-multilib git gnutls-dev gperf haveged help2man intltool lib32gcc-s1 libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libncurses-dev libpython3-dev libreadline-dev libssl-dev libtool libyaml-dev libz-dev lld llvm lrzsz mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf python3 python3-pip python3-ply python3-docutils python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
+      - name: Install feeds
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+      - name: Configure firmware
+        run: |
+          cp configs/an7581.config .config
+          sed -i 's/^CONFIG_TARGET_airoha_an7581_DEVICE_.*=y$/# &/' .config
+          sed -i '/^# CONFIG_TARGET_airoha_an7581_DEVICE_znxt_zn515xg-d is not set$/c\CONFIG_TARGET_airoha_an7581_DEVICE_znxt_zn515xg-d=y' .config
+          make defconfig
+          grep '^CONFIG_TARGET_airoha_an7581_DEVICE_znxt_zn515xg-d=y$' .config
+      - name: Build
+        run: make -j"$(nproc)" || make -j1 V=s
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: ponwrt-zn515xg-d
+          path: |
+            bin/targets/airoha/an7581/*zn515xg-d*
+            bin/targets/airoha/an7581/sha256sums
+          if-no-files-found: error
+          retention-days: 30
